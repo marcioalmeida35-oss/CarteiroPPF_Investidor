@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Klabin Analytics - Home</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #064e3b 0%, #059669 100%); }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
+        .loading-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+    <!-- Header Principal -->
+    <nav class="gradient-bg text-white p-5 shadow-xl">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <i class="fas fa-leaf text-2xl"></i>
+                <span class="text-xl font-bold tracking-tight">KlabinAnalytics <span class="font-light text-emerald-200">2026</span></span>
+            </div>
+            <div id="connectionStatus" class="flex items-center text-xs space-x-2 bg-black/30 px-4 py-2 rounded-full border border-white/10">
+                <span class="w-2 h-2 bg-emerald-400 rounded-full"></span>
+                <span class="font-medium">API Yahoo Finance Ativa</span>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-6xl mx-auto p-4 md:p-10">
+        
+        <!-- Seletor de Ativos -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+            <div>
+                <h1 class="text-3xl font-black text-slate-800">Calculadora de Preço Teto</h1>
+                <p class="text-slate-500 font-medium">Projeções de rendimentos para o ciclo 2026</p>
+            </div>
+            <div class="inline-flex p-1.5 bg-slate-200 rounded-2xl shadow-inner border border-slate-300">
+                <button onclick="switchAsset('KLBN11')" id="btnKLBN11" class="px-8 py-3 rounded-xl font-bold transition-all bg-white shadow-md text-emerald-700">KLBN11</button>
+                <button onclick="switchAsset('KLBN4')" id="btnKLBN4" class="px-8 py-3 rounded-xl font-bold transition-all text-slate-600 hover:text-emerald-600">KLBN4</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Coluna de Parâmetros (4/12) -->
+            <div class="lg:col-span-4 space-y-6">
+                <div class="glass-card p-8 rounded-[2rem] shadow-xl border border-white">
+                    <h3 class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Definições da Carteira</h3>
+                    
+                    <div class="space-y-6">
+                        <div class="relative">
+                            <label class="block text-xs font-bold text-slate-500 mb-2 ml-1">Cotação Atual (Mercado)</label>
+                            <div class="relative group">
+                                <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                <input type="number" id="inputPrice" step="0.01" oninput="manualOverride()" class="w-full pl-12 pr-12 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 focus:bg-white outline-none font-black text-slate-700 transition-all">
+                                <button onclick="fetchPrices()" class="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-600 hover:scale-110 transition-transform">
+                                    <i class="fas fa-sync-alt"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-2 ml-1">Dividendos Extra (Já Aprovados)</label>
+                            <input type="number" id="inputExtra" readonly class="w-full p-4 bg-slate-100 border-2 border-transparent rounded-2xl text-slate-400 font-bold cursor-not-allowed">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-2 ml-1">Projeção Regular 2026 (R$)</label>
+                            <input type="number" id="inputRegular" step="0.01" oninput="updateCalculations()" class="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 outline-none font-black text-slate-700">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-2 ml-1">Yield Alvo (Dividendo Mínimo)</label>
+                            <select id="inputYield" onchange="updateCalculations()" class="w-full p-4 border-2 border-slate-100 rounded-2xl focus:border-emerald-500 outline-none font-black text-slate-700 appearance-none bg-white">
+                                <option value="0.06">6% - Estratégia Bazin</option>
+                                <option value="0.08" selected>8% - Médio Prazo</option>
+                                <option value="0.10">10% - Máxima Renda</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Coluna de Dashboard (8/12) -->
+            <div class="lg:col-span-8 space-y-8">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Preço Teto -->
+                    <div class="gradient-bg rounded-[2.5rem] p-10 text-white shadow-2xl relative overflow-hidden group">
+                        <div class="relative z-10">
+                            <span class="text-emerald-100 text-sm font-bold uppercase tracking-widest opacity-80">Preço Máximo de Compra</span>
+                            <div id="displayTeto" class="text-6xl font-black mt-3 tabular-nums">R$ 0,00</div>
+                            <div class="mt-6 flex items-center space-x-2 text-xs font-bold bg-white/10 backdrop-blur w-fit px-4 py-2 rounded-full border border-white/10">
+                                <i class="fas fa-check-double text-emerald-300"></i>
+                                <span>Garante o Yield de <span id="yieldRef">8</span>%</span>
+                            </div>
+                        </div>
+                        <i class="fas fa-vault absolute -right-6 -bottom-6 text-[12rem] opacity-5 group-hover:scale-110 transition-transform duration-700"></i>
+                    </div>
+
+                    <!-- Margem -->
+                    <div id="cardMargem" class="bg-white rounded-[2.5rem] p-10 shadow-xl border-b-[12px] transition-all duration-500">
+                        <span class="text-slate-400 text-sm font-bold uppercase tracking-widest">Margem de Segurança</span>
+                        <div id="displayMargem" class="text-6xl font-black mt-3 tabular-nums">0%</div>
+                        <div id="msgMargem" class="mt-6 text-sm font-black flex items-center"></div>
+                    </div>
+                </div>
+
+                <!-- Tabela de Cenários -->
+                <div class="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
+                    <div class="px-8 py-6 bg-slate-50/80 border-b border-slate-100 flex justify-between items-center">
+                        <h3 class="font-black text-slate-800 uppercase text-xs tracking-widest">Cenários por Yield</h3>
+                        <span class="bg-emerald-100 text-emerald-700 text-[10px] font-black px-3 py-1 rounded-full">DADOS 2026</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="text-slate-400 text-[10px] font-black uppercase tracking-tighter">
+                                    <th class="px-8 py-5">Rendimento Alvo</th>
+                                    <th class="px-8 py-5">Dividendo Projetado</th>
+                                    <th class="px-8 py-5 text-right">Preço Teto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="yieldTable" class="text-slate-700 font-bold"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-20 py-10 bg-slate-900 text-slate-500 text-center text-xs">
+        <div class="max-w-6xl mx-auto px-4">
+            <p class="font-bold mb-2">Atenção: Este site é uma ferramenta de simulação matemática.</p>
+            <p>Os dividendos projetados dependem dos lucros futuros da Klabin S.A. e não são garantidos.</p>
+        </div>
+    </footer>
+
+    <script>
+        let currentAsset = 'KLBN11';
+        let isManual = false;
+        
+        const config = {
+            'KLBN11': { symbol: 'KLBN11.SA', extra: 0.9119, regular: 0.85 },
+            'KLBN4': { symbol: 'KLBN4.SA', extra: 0.1824, regular: 0.17 }
+        };
+
+        async function fetchPrices() {
+            try {
+                const status = document.getElementById('connectionStatus');
+                status.innerHTML = `<span class="w-2 h-2 bg-yellow-400 rounded-full loading-pulse"></span><span class="font-bold">A Conectar...</span>`;
+
+                const symbol = config[currentAsset].symbol;
+                const response = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
+                const data = await response.json();
+                const price = data.chart.result[0].meta.regularMarketPrice;
+
+                if (!isManual) {
+                    document.getElementById('inputPrice').value = price.toFixed(2);
+                    updateCalculations();
+                }
+
+                status.innerHTML = `<span class="w-2 h-2 bg-emerald-400 rounded-full"></span><span class="font-bold">Tempo Real: ${symbol}</span>`;
+            } catch (error) {
+                document.getElementById('connectionStatus').innerHTML = `<span class="w-2 h-2 bg-red-500 rounded-full"></span><span class="font-bold text-red-400">Offline (Cotação Manual)</span>`;
+            }
+        }
+
+        function switchAsset(asset) {
+            currentAsset = asset;
+            isManual = false;
+            
+            document.getElementById('btnKLBN11').className = asset === 'KLBN11' 
+                ? 'px-8 py-3 rounded-xl font-bold transition-all bg-white shadow-md text-emerald-700' 
+                : 'px-8 py-3 rounded-xl font-bold transition-all text-slate-600 hover:text-emerald-600';
+            
+            document.getElementById('btnKLBN4').className = asset === 'KLBN4' 
+                ? 'px-8 py-3 rounded-xl font-bold transition-all bg-white shadow-md text-emerald-700' 
+                : 'px-8 py-3 rounded-xl font-bold transition-all text-slate-600 hover:text-emerald-600';
+
+            document.getElementById('inputExtra').value = config[asset].extra;
+            document.getElementById('inputRegular').value = config[asset].regular;
+            
+            fetchPrices();
+        }
+
+        function manualOverride() {
+            isManual = true;
+            updateCalculations();
+        }
+
+        function updateCalculations() {
+            const extra = parseFloat(document.getElementById('inputExtra').value);
+            const regular = parseFloat(document.getElementById('inputRegular').value);
+            const yieldAlvo = parseFloat(document.getElementById('inputYield').value);
+            const priceActual = parseFloat(document.getElementById('inputPrice').value) || 0;
+
+            const dpaTotal = extra + regular;
+            const teto = dpaTotal / yieldAlvo;
+            const margem = priceActual > 0 ? ((teto / priceActual) - 1) * 100 : 0;
+
+            document.getElementById('yieldRef').innerText = (yieldAlvo * 100);
+            document.getElementById('displayTeto').innerText = `R$ ${teto.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('displayMargem').innerText = `${margem.toFixed(1)}%`;
+            
+            const cardMargem = document.getElementById('cardMargem');
+            const msgMargem = document.getElementById('msgMargem');
+
+            if (margem > 0) {
+                cardMargem.style.borderColor = '#10b981';
+                document.getElementById('displayMargem').className = 'text-6xl font-black mt-3 tabular-nums text-emerald-600';
+                msgMargem.className = 'mt-6 text-sm font-black flex items-center text-emerald-600';
+                msgMargem.innerHTML = '<i class="fas fa-circle-check mr-2"></i> COMPRA RECOMENDADA (ABAIXO DO TETO)';
+            } else {
+                cardMargem.style.borderColor = '#ef4444';
+                document.getElementById('displayMargem').className = 'text-6xl font-black mt-3 tabular-nums text-red-500';
+                msgMargem.className = 'mt-6 text-sm font-black flex items-center text-red-500';
+                msgMargem.innerHTML = '<i class="fas fa-circle-exclamation mr-2"></i> AGUARDAR: ACIMA DO PREÇO TETO';
+            }
+
+            renderTable(dpaTotal);
+        }
+
+        function renderTable(dpa) {
+            const yields = [0.06, 0.07, 0.08, 0.09, 0.10, 0.12];
+            const tbody = document.getElementById('yieldTable');
+            tbody.innerHTML = '';
+
+            yields.forEach(y => {
+                const teto = dpa / y;
+                tbody.innerHTML += `
+                    <tr class="border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                        <td class="px-8 py-5 text-slate-800">${(y * 100)}% ao ano</td>
+                        <td class="px-8 py-5 text-slate-400">R$ ${dpa.toFixed(4)}</td>
+                        <td class="px-8 py-5 text-right font-black text-emerald-600">R$ ${teto.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        setInterval(fetchPrices, 300000);
+        window.onload = () => switchAsset('KLBN11');
+    </script>
+</body>
+</html>
+
